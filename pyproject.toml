@@ -1,0 +1,233 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retail-simulator"
+version = "0.1.0"
+description = "A retail operations simulator"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "pencho-dobrev" }]
+dependencies = ["numpy>=1.26,<2.0"]
+
+[project.optional-dependencies]
+# RL adapter frameworks — only envs/ may import these, never core/ (CI-enforced).
+rl = [
+    "gymnasium>=0.29,<1.1",
+    "pettingzoo>=1.24,<1.25",
+]
+# Training/harness only — never imported by core/ or envs/. supersuit is the
+# Phase 0.5 SuperSuit↔SB3 parameter-sharing bridge (the PettingZoo Parallel env ->
+# one shared self-play policy); it pins cleanly against the locked pettingzoo 1.24
+# + sb3 2.x ranges (verified: supersuit 3.10 with pettingzoo 1.24.3 + sb3 2.8).
+train = [
+    "stable-baselines3>=2.3,<3.0",
+    "supersuit>=3.9,<4.0",
+]
+# CLI (`retail-sim`) — Typer app in the harness tier; not imported by core/envs/.
+cli = [
+    "typer>=0.12",
+]
+# Scenario config surface (`scenarios/`) — YAML → ScenarioConfig → CoreConfig. Only
+# `scenarios` (and the CLI/harness that consume it) import these; never core/envs.
+scenarios = [
+    "pydantic>=2.0,<3.0",
+    "pyyaml>=6.0",
+]
+serve = [
+    "websockets>=12,<14",
+]
+recurrent = [
+    "sb3-contrib>=2.3,<3.0",
+]
+# Phase web-platform (`web/`) — the FastAPI HTTP layer (T2) over the SYNC session core
+# (T1). FastAPI + uvicorn are HEAVY and OPTIONAL; only `web/`'s T2 server module imports
+# them, and it does so LAZILY inside the server entrypoint so `import retail_simulator.web`
+# does NOT pull FastAPI at load time (mirrors the Phase 2.0 lazy-`websockets` contract;
+# enforced by the lazy-import smoke test + the `web` import-linter contract below).
+web = [
+    "fastapi>=0.110,<1.0",
+    "uvicorn[standard]>=0.29,<1.0",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pre-commit>=3.8",
+    "import-linter>=2.0",
+    "pytest-benchmark>=4.0",
+    # Wave 5: the CLI tests import the Typer app, so dev installs the [cli] extra.
+    "typer>=0.12",
+    # Phase 0.5: the scenario tests import ScenarioConfig + load YAML, so dev installs
+    # the [scenarios] extra (pydantic + pyyaml).
+    "pydantic>=2.0,<3.0",
+    "pyyaml>=6.0",
+    "websockets>=12,<14",
+    "pytest-asyncio>=0.23,<0.25",
+    # Phase web-platform: the web tests import the session core; T2's HTTP tests import
+    # FastAPI's TestClient, so dev installs the [web] extra (fastapi + uvicorn). Starlette's
+    # TestClient is backed by httpx, so dev installs it too (test-only — never a runtime
+    # dep of web/, which stays fastapi/uvicorn-only at the network boundary).
+    "fastapi>=0.110,<1.0",
+    "uvicorn[standard]>=0.29,<1.0",
+    "httpx>=0.27,<1.0",
+]
+
+[project.entry-points."gymnasium.envs"]
+__root__ = "retail_simulator.envs:register_env"
+
+# CLI entry point (Wave 5). `retail-sim` -> the Typer app in cli.py. Requires the
+# `[cli]` extra (typer); the harness tier may import gymnasium/sb3.
+[project.scripts]
+retail-sim = "retail_simulator.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: heavier tests (short PPO runs, throughput timing) — `-m 'not slow'` to skip",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+# The Vite/React SPA (Slice 3+) carries no Python; keep ruff off it explicitly so a
+# stray .py (e.g. a future build helper) is never linted with the simulator's rules.
+extend-exclude = ["frontend"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["retail_simulator"]
+mypy_path = "src"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+
+# pettingzoo (the Phase 0.5 Parallel-env framework) ships no py.typed marker / stubs,
+# so importing it is an untyped third-party import. Ignore the missing stubs (the same
+# treatment any untyped dependency gets); our adapter's own surface stays fully typed.
+[[tool.mypy.overrides]]
+module = ["pettingzoo.*"]
+ignore_missing_imports = true
+
+# pyyaml (the Phase 0.5 scenario-loader dependency) ships no bundled stubs either, so
+# `import yaml` is an untyped third-party import. Ignore the missing stubs (same
+# treatment as pettingzoo); the scenarios module's own surface stays fully typed.
+[[tool.mypy.overrides]]
+module = ["yaml.*"]
+ignore_missing_imports = true
+
+# supersuit (the Phase 0.5 SuperSuit↔SB3 parameter-sharing bridge) ships no py.typed
+# marker / stubs, so `import supersuit` is an untyped third-party import. Ignore the
+# missing stubs (same treatment as pettingzoo/yaml); the harness bridge's own surface
+# stays fully typed (the lazy `import supersuit as ss` lives inside the bridge function).
+[[tool.mypy.overrides]]
+module = ["supersuit.*"]
+ignore_missing_imports = true
+
+# fastapi + uvicorn (the Phase web-platform [web] extra) are optional HTTP deps imported
+# only by T2's server module (lazily). They may be absent in a base/dev checkout, so treat
+# missing stubs/imports as ignorable (same treatment as pettingzoo/yaml/supersuit); the
+# web package's own surface stays fully typed and FastAPI-free in T1.
+[[tool.mypy.overrides]]
+module = ["fastapi.*", "uvicorn.*"]
+ignore_missing_imports = true
+
+# matplotlib is an optional, lazily-imported dep of harness/learnability.py's
+# learning-curve plotting (it degrades to a no-op when matplotlib isn't
+# installed — see that module's docstring). There is no `[viz]` extra in this
+# project, so a base/dev checkout may not have it. Ignore the missing stubs
+# (same treatment as pettingzoo/yaml/supersuit/fastapi); learnability.py's own
+# surface stays fully typed.
+[[tool.mypy.overrides]]
+module = ["matplotlib.*"]
+ignore_missing_imports = true
+
+[tool.importlinter]
+root_package = "retail_simulator"
+# Required so forbidden externals (gymnasium, etc.) are analyzed, not skipped.
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "core is framework/network/viz free"
+type = "forbidden"
+source_modules = ["retail_simulator.core"]
+forbidden_modules = [
+    "gymnasium",
+    "pettingzoo",
+    "stable_baselines3",
+    # supersuit (the Phase 0.5 SuperSuit↔SB3 bridge) is a harness-only training
+    # dependency; core must never import it (the same treatment as sb3/pettingzoo).
+    "supersuit",
+    # Forbidding "ray" also covers ray.rllib (subpackage externals aren't
+    # individually listable, and any ray import is disallowed in core anyway).
+    "ray",
+    "socket",
+    "requests",
+    "matplotlib",
+]
+
+[[tool.importlinter.contracts]]
+name = "scenarios imports only core"
+type = "forbidden"
+source_modules = ["retail_simulator.scenarios"]
+forbidden_modules = [
+    "retail_simulator.envs",
+    "retail_simulator.harness",
+    "retail_simulator.cli",
+    "gymnasium",
+    "pettingzoo",
+    "stable_baselines3",
+    "supersuit",
+]
+
+[[tool.importlinter.contracts]]
+name = "harness does not import cli/network"
+type = "forbidden"
+source_modules = ["retail_simulator.harness"]
+forbidden_modules = [
+    "retail_simulator.cli",
+    "ray",
+    "socket",
+    "requests",
+]
+
+[[tool.importlinter.contracts]]
+name = "live does not import cli / training / network primitives outside websockets"
+type = "forbidden"
+source_modules = ["retail_simulator.live"]
+forbidden_modules = [
+    "retail_simulator.cli",
+    "retail_simulator.harness",
+    "stable_baselines3",
+    "supersuit",
+    "ray",
+    "socket",
+    "requests",
+]
+
+# Layer integrity: web/ is the Phase web-platform transport layer — a FOURTH transport
+# over the single World.step seam, sibling to envs/ + harness/ + live/. UNLIKE live/, the
+# web session core DRIVES the hot-seat engine (it re-orchestrates the engine's public
+# seam in a worker thread), so it MAY import core (the world model), envs (the parallel
+# env), harness (the hot-seat engine + spike config + archetypes + scoring helpers),
+# scenarios (for future config loading), and the optional fastapi/uvicorn deps (the [web]
+# extra, imported lazily inside T2's server.py to keep package-import cheap). It must NOT
+# import the CLI (a layer above) nor a raw socket library (FastAPI/uvicorn is the network
+# boundary, never a hand-rolled socket). The lazy FastAPI import is enforced by the
+# lazy-import smoke test (the same discipline as live/'s lazy websockets).
+[[tool.importlinter.contracts]]
+name = "web does not import cli / raw network primitives outside fastapi/uvicorn"
+type = "forbidden"
+source_modules = ["retail_simulator.web"]
+forbidden_modules = [
+    "retail_simulator.cli",
+    "ray",
+    "socket",
+    "requests",
+]

@@ -1,0 +1,8 @@
+runs/
+.venv/
+__pycache__/
+*.zip
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
