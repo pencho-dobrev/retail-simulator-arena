@@ -1,0 +1,88 @@
+name: Competition entry
+description: Submit a trained agent to the retail-simulator arena.
+title: "[Entry] <team> — <agent name>"
+labels: ["entry"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit **one** trained checkpoint. Attach your Stable-Baselines3 `.zip`
+        (produced by `model.save(...)`) by dragging it into the **Checkpoint** field
+        below. See the README for how the entry is trained, self-checked, and scored.
+        Final scoring is run by the organizer on undisclosed seeds and home rotations.
+  - type: input
+    id: team
+    attributes:
+      label: Team
+      description: Your team name, as it should appear in the standings.
+    validations:
+      required: true
+  - type: input
+    id: agent_name
+    attributes:
+      label: Agent name
+      description: The name for this checkpoint's seat.
+    validations:
+      required: true
+  - type: dropdown
+    id: policy_kind
+    attributes:
+      label: Policy kind
+      description: >-
+        Which of the two loadable kinds this zip is. The tooling tries to auto-detect,
+        but falls back to ppo-mlp without failing when it cannot read the zip — so your
+        declaration is what makes a silent demotion visible.
+      options:
+        - ppo-mlp
+        - recurrent-ppo-lstm
+    validations:
+      required: true
+  - type: input
+    id: sb3_version
+    attributes:
+      label: stable-baselines3 version
+      description: The stable-baselines3 version that saved the zip (the repo pins >=2.3,<3.0).
+      placeholder: "2.8.0"
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: Contact
+      description: How the organizer reaches you about the entry.
+    validations:
+      required: true
+  - type: textarea
+    id: training_recipe
+    attributes:
+      label: Training recipe
+      description: >-
+        Free text, or paste the contents of the recipe.json that arena_train_player.py
+        wrote into your pool directory.
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: checkpoint
+    attributes:
+      label: Checkpoint
+      description: Drag-and-drop your Stable-Baselines3 .zip checkpoint here to attach it.
+      placeholder: Attach your model .zip here (the same one you self-checked).
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Before you file it
+      description: Confirm each — an entry that fails any of these is not scored.
+      options:
+        - label: The zip loads and plays a full 1,000-round match against the NPC field without erroring (I ran the self-check).
+          required: true
+        - label: I declared the correct policy kind above (the auto-detect is silent — a wrong declaration loads a RecurrentPPO entry stateless).
+          required: true
+        - label: The policy's predict reads nothing but the observation — no network calls, no file reads at decision time.
+          required: true
+        - label: It is deterministic — the same observation and seed produce the same action.
+          required: true
+        - label: This is my team's only entry (at most one checkpoint per team).
+          required: true
