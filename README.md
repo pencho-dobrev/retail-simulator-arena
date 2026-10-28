@@ -154,9 +154,21 @@ python scripts/arena_competition.py --balanced --rounds 1000 \
 
 ## Submit
 
-Open an entry with the
-[competition entry form](https://github.com/pencho-dobrev/retail-simulator-arena/issues/new?template=competition-entry.yml)
-and attach two files to it: your checkpoint `.zip` and an `entry.json`.
+An entry is a checkpoint `.zip` and an `entry.json` describing it. The `.zip`
+never goes on the public issue: issue attachments are public, so anyone,
+rival entrants included, could download your checkpoint before the deadline.
+
+1. Open an entry with the
+   [competition entry form](https://github.com/pencho-dobrev/retail-simulator-arena/issues/new?template=competition-entry.yml).
+   Its fields are your `entry.json` (you may also attach the `entry.json` file,
+   which holds no weights). Give the SHA-256 of your `.zip`:
+   `shasum -a 256 model.zip` on macOS, `sha256sum model.zip` on Linux,
+   `Get-FileHash model.zip` in Windows PowerShell.
+2. Do **not** attach the `.zip` to the issue.
+3. Send the `.zip` to the organizer privately, via
+   `<announced by the organizer>`, before the deadline.
+4. The organizer confirms on your issue that the `.zip` received matches the
+   SHA-256 you gave, and scores exactly that file.
 
 `entry.json` describes the checkpoint. It has six fields, the same ones the form
 asks for:

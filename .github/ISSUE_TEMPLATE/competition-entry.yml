@@ -9,10 +9,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        Submit **one** trained checkpoint. Attach two files by dragging them into the
-        **Checkpoint** field below: your Stable-Baselines3 or sb3-contrib `.zip` (produced
-        by `model.save(...)`) and your `entry.json` (its fields are listed in the README's
-        Submit section). See the README for how the entry is trained, self-checked, and scored.
+        Submit **one** trained checkpoint. The fields below are your `entry.json` (listed in
+        the README's Submit section); you may also attach the `entry.json` file itself, which
+        holds no weights. **Do not attach your `.zip` here**: issue attachments are public.
+        Give its SHA-256 below and send the `.zip` itself to the organizer privately, via
+        `<announced by the organizer>`, before the deadline. The organizer confirms on this
+        issue that the zip received matches the SHA-256, and scores exactly that file.
+        See the README for how the entry is trained, self-checked, and scored.
         Final scoring is a tournament among the entries, with no NPCs: entrants are grouped
         into matches of up to six, with seats, home regions and (in larger fields) groups
         rotated across several matches, and ranked by aggregate profit, on an undisclosed
@@ -79,14 +82,15 @@ body:
       render: shell
     validations:
       required: false
-  - type: textarea
-    id: checkpoint
+  - type: input
+    id: checkpoint_sha256
     attributes:
-      label: Checkpoint
+      label: SHA-256 of your checkpoint zip
       description: >-
-        Drag-and-drop both files here to attach them: your Stable-Baselines3 or sb3-contrib
-        .zip checkpoint and your entry.json.
-      placeholder: Attach your model .zip (the same one you self-checked) and your entry.json here.
+        The SHA-256 of the .zip you self-checked and will send privately:
+        `shasum -a 256 model.zip` on macOS, `sha256sum model.zip` on Linux,
+        `Get-FileHash model.zip` in Windows PowerShell. Do not attach the .zip to this issue.
+      placeholder: 64 hexadecimal characters
     validations:
       required: true
   - type: checkboxes
