@@ -7,7 +7,7 @@ name = "retail-simulator"
 version = "0.1.0"
 description = "A retail operations simulator"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 license = { text = "MIT" }
 authors = [{ name = "pencho-dobrev" }]
 dependencies = ["numpy>=1.26,<2.0"]
