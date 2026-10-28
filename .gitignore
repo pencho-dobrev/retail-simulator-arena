@@ -6,3 +6,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+# Written to the repo root by the README self-check
+/results.json
+/decisions.csv

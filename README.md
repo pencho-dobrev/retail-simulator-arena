@@ -8,8 +8,12 @@ world's tuning are intentionally not included.
 ## Setup
 
 Use Python 3.11 or 3.12. Python 3.13 and newer are not supported: `numpy<2.0`
-publishes no prebuilt wheels for them, so pip stops with
-`No matching distribution found for numpy` or has to compile numpy from source.
+publishes no prebuilt wheels for them, so `pip install` refuses them up front:
+
+```text
+ERROR: Package 'retail-simulator' requires a different Python: 3.14.6 not in '<3.13,>=3.11'
+```
+
 If `python3` is newer than 3.12, create the environment with
 `python3.12 -m venv .venv` instead.
 
@@ -141,7 +145,28 @@ starting point to read and change, not a tuned entry.
 
 ```bash
 python scripts/train_vs_npcs.py my_ppo --algo ppo --steps 300000 --out runs/my_ppo.zip
+python scripts/train_vs_npcs.py my_sac --algo sac --steps 300000 --out runs/my_sac.zip
+python scripts/train_vs_npcs.py my_rppo --algo recurrent_ppo --steps 300000 --out runs/my_rppo.zip
 ```
+
+Declare the matching `policy_kind` in `entry.json` (see [Submit](#submit)). To
+confirm a saved zip holds the policy class you expect, print it with the
+one-liner below. It reads the `policy_class` entry of the zip's `data` file and
+decodes its text; nothing is unpickled, and neither torch nor Stable-Baselines3
+needs to be installed.
+
+| `--algo` | `policy_kind` | The one-liner prints |
+| --- | --- | --- |
+| `ppo` | `ppo-mlp` | `stable_baselines3.common.policies ActorCriticPolicy` |
+| `sac` | `sac` | `stable_baselines3.sac.policies SACPolicy` |
+| `recurrent_ppo` | `recurrent-ppo-lstm` | `sb3_contrib.common.recurrent.policies RecurrentActorCriticPolicy` |
+
+```bash
+python -c "import base64,json,re,sys,zipfile; d=json.loads(zipfile.ZipFile(sys.argv[1]).read('data')); print(*re.findall(r'[A-Za-z_][\w.]{3,}', base64.b64decode(d['policy_class'][':serialized:']).decode('latin-1')))" runs/my_sac.zip
+```
+
+It tells policy families apart, not every algorithm: A2C also prints
+`ActorCriticPolicy`, and DDPG prints `TD3Policy`.
 
 ## Self-check
 
