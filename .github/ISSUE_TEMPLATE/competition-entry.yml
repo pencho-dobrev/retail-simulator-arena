@@ -9,12 +9,13 @@ body:
   - type: markdown
     attributes:
       value: |
-        Submit **one** trained checkpoint. The fields below are your `entry.json` (listed in
-        the README's Submit section); you may also attach the `entry.json` file itself, which
-        holds no weights. **Do not attach your `.zip` here**: issue attachments are public.
+        Submit **one** trained checkpoint. The first six fields below are your `entry.json`
+        (listed in the README's Submit section) and the last is your zip's SHA-256; you may
+        also attach the `entry.json` file itself, which holds no weights. **Do not attach your `.zip` here**: issue attachments are public.
         Give its SHA-256 below and send the `.zip` itself to the organizer privately, via
-        `<announced by the organizer>`, before the deadline. The organizer confirms on this
-        issue that the zip received matches the SHA-256, and scores exactly that file.
+        `TBA — announced by the organizer`, before the deadline. The organizer confirms on
+        this issue that the zip received matches the SHA-256 (compared case-insensitively),
+        and scores exactly that file.
         See the README for how the entry is trained, self-checked, and scored.
         Final scoring is a tournament among the entries, with no NPCs: entrants are grouped
         into matches of up to six, with seats, home regions and (in larger fields) groups

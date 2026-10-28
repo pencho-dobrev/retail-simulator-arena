@@ -65,7 +65,7 @@ python scripts/arena_train_player.py my_share --world balanced \
 When training finishes, the trainer plays the pool's own checkpoints against each
 other and prints a table ending in a `VERDICT: rl_confirms=…` line. That line is
 a diagnostic about the pool of checkpoints, not a check on your agent:
-`rl_confirms=False (RL does NOT confirm)` does not mean training failed, and it
+`rl_confirms=False` ("RL does NOT confirm") does not mean training failed, and it
 has no bearing on whether a checkpoint is a valid entry. The same goes for the
 warning `only N distinct trained checkpoint(s)` on short runs, which ends with
 `(Expected with --smoke's tiny round count; …)`. `--smoke` is a flag of the
@@ -92,7 +92,7 @@ play the 318-dimensional arena. Pass the arena explicitly:
 | Argument | Default | In the arena |
 | --- | --- | --- |
 | `config` | 2-region world, weighted reward | `arena_balanced_config()` from `retail_simulator.envs.arena`: 25 regions, profit reward unless you change it, 318-dimensional observation |
-| `home_regions` | none; seat 0 then starts with a store in **every** region | `arena_home_regions(n_seats)`: one home per seat, regions `1, 5, 9, …` in seat order |
+| `home_regions` | none; with no `npc_archetypes` either, seat 0 then starts with a store in **every** region | `arena_home_regions(n_seats)`: one home per seat, regions `1, 5, 9, …` in seat order |
 | `mask_expansion_seats` | none | your learning seat(s). The trainer and the self-check both play your seat with expansion masking on |
 | `n_learning_agents` | 2 | seats played by your policy. Every seat this function builds is played by the one shared policy |
 | `npc_archetypes` | none | leave it empty; see the first trap below |
@@ -160,18 +160,19 @@ rival entrants included, could download your checkpoint before the deadline.
 
 1. Open an entry with the
    [competition entry form](https://github.com/pencho-dobrev/retail-simulator-arena/issues/new?template=competition-entry.yml).
-   Its fields are your `entry.json` (you may also attach the `entry.json` file,
-   which holds no weights). Give the SHA-256 of your `.zip`:
+   Its first six fields are your `entry.json` (you may also attach the
+   `entry.json` file, which holds no weights). The last is the SHA-256 of your
+   `.zip`:
    `shasum -a 256 model.zip` on macOS, `sha256sum model.zip` on Linux,
    `Get-FileHash model.zip` in Windows PowerShell.
 2. Do **not** attach the `.zip` to the issue.
 3. Send the `.zip` to the organizer privately, via
-   `<announced by the organizer>`, before the deadline.
+   `TBA — announced by the organizer`, before the deadline.
 4. The organizer confirms on your issue that the `.zip` received matches the
-   SHA-256 you gave, and scores exactly that file.
+   SHA-256 you gave (compared case-insensitively), and scores exactly that file.
 
-`entry.json` describes the checkpoint. It has six fields, the same ones the form
-asks for:
+`entry.json` describes the checkpoint. It has six fields; the form asks for the
+same six, plus the SHA-256 of your `.zip`:
 
 | Field | Value | Notes |
 | --- | --- | --- |
