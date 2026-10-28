@@ -67,9 +67,9 @@ other and prints a table ending in a `VERDICT: rl_confirms=…` line. That line 
 a diagnostic about the pool of checkpoints, not a check on your agent:
 `rl_confirms=False (RL does NOT confirm)` does not mean training failed, and it
 has no bearing on whether a checkpoint is a valid entry. The same goes for the
-warning `only N distinct trained checkpoint(s) — a tournament needs >=3 …
-(Expected with --smoke's tiny round count …)` on short runs. `--smoke` is a flag
-of the underlying driver, `scripts/phase4_rl_confirm.py`, and
+warning `only N distinct trained checkpoint(s)` on short runs, which ends with
+`(Expected with --smoke's tiny round count; …)`. `--smoke` is a flag of the
+underlying driver, `scripts/phase4_rl_confirm.py`, and
 `arena_train_player.py` does not take it; ignore the warning. Whether an entry
 is valid comes down to the checklist on the entry form, starting with the
 [self-check](#self-check).
