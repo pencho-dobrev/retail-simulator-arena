@@ -71,8 +71,8 @@ warning `only N distinct trained checkpoint(s) — a tournament needs >=3 …
 (Expected with --smoke's tiny round count …)` on short runs. `--smoke` is a flag
 of the underlying driver, `scripts/phase4_rl_confirm.py`, and
 `arena_train_player.py` does not take it; ignore the warning. Whether an entry
-is valid is decided by the [self-check](#self-check) and the checklist on the
-entry form.
+is valid comes down to the checklist on the entry form, starting with the
+[self-check](#self-check).
 
 ### Your own training loop
 
@@ -119,7 +119,7 @@ Four traps to know about:
 - **Leaving out `home_regions` gives seat 0 the whole map.** With no
   `home_regions` and no `npc_archetypes`, seat 0 starts with a store in all 25
   regions and every other seat with one, so a policy trained there never sees
-  the one-store start it is scored from. The self-check seats every entry in a
+  the one-store start it is scored from. The self-check seats every seat in a
   single home region, and final scoring rotates those home regions (see
   [Rules](#rules)).
 - **The environment never ends an episode.** `terminated` and `truncated` are
