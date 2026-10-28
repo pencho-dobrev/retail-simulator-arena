@@ -1,7 +1,7 @@
 """Example trainer: one learning seat against the NPC field, with your own loop.
 
-``scripts/arena_train_player.py`` is two-seat league self-play at fixed home regions. This
-script is the other common baseline: ONE learning seat in the same five-seat field the
+``scripts/arena_train_player.py`` trains in a two-seat match at fixed home regions (1 and 5).
+This script is the other common baseline: ONE learning seat in the same five-seat field the
 self-check plays (``cherry-picker``, ``fortress``, ``fast-follower``, ``sprawler``), written as a
 plain Gymnasium env so any Stable-Baselines3 algorithm can train on it. It is a starting point
 to read and edit, not a tuned entry.
@@ -14,16 +14,19 @@ Choices worth knowing, and why they are made:
 * Homes and seeds. Every episode shuffles the six published metro homes (1, 5, 9, 13, 17, 21)
   across the five seats and draws a fresh world seed, so the policy cannot memorise one seating.
 * Truncation. The raw env never ends an episode, so the wrapper truncates at ``--episode-ticks``
-  (the match length, 1000). SB3 bootstraps through a truncation instead of treating it as a loss.
+  (the match length, 1000). SB3 bootstraps the value through a truncation instead of treating
+  it as a terminal state.
 * Bounded logits. The 35 argmax-decoded logit dims (expansion, automation) are bounded +/-1e9
   in the env's action space. SAC squashes through tanh to the space's bounds, so for SAC they are
   bounded to [-1, 1], which decodes identically. Continuous levers keep their true bounds.
   ``--bound-logits`` / ``--no-bound-logits`` overrides the default (on for SAC only).
-* Scoring never applies ``VecNormalize`` statistics, so nothing here normalises observations
-  except SAC's fixed scale, which is folded into the network's first layer before saving.
-  Rewards are scaled for training only: ``VecNormalize(norm_obs=False)`` for the PPO family, a
-  fixed factor for SAC (SB3's off-policy algorithms store the un-normalised reward, which would
-  make ``VecNormalize`` do nothing there).
+* Scoring never applies ``VecNormalize`` statistics, so observations are not normalised in
+  the env. Raw observations reach ~2e4 (cash); the PPO family trains on them as they are. SAC
+  trains on ``obs / scale`` and the scale is then folded into the first layer, so the saved zip
+  still takes raw observations (the fold is checked: predictions must match to 1e-5).
+* Rewards are scaled for training only: ``VecNormalize(norm_obs=False)`` for the PPO family, a
+  fixed factor for SAC. SB3's off-policy algorithms store the un-normalised reward, so
+  ``VecNormalize`` would do nothing there. SAC's logged episode reward carries that factor.
 * Seeding follows the README: ``set_random_seed``, not the ``seed=`` argument. Each env copy is
   built separately with its own seed; cloning one env would replay identical worlds.
 
@@ -242,7 +245,7 @@ def train(args: argparse.Namespace) -> Any:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description="Train one arena entry against the NPC field.")
     parser.add_argument("label", help="run name; names the default --out")
     parser.add_argument("--algo", choices=("ppo", "recurrent_ppo", "sac"), default="ppo")
     parser.add_argument("--steps", type=int, default=300_000, help="env steps summed over copies")
