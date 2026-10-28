@@ -3,8 +3,7 @@
 ``scripts/arena_train_player.py`` trains in a two-seat match at fixed home regions (1 and 5).
 This script is the other common baseline: ONE learning seat in the five-seat field the
 self-check plays (``cherry-picker``, ``fortress``, ``fast-follower``, ``sprawler``), as a plain
-Gymnasium env that any Stable-Baselines3 algorithm can train on. A starting point, not a tuned
-entry.
+Gymnasium env any Stable-Baselines3 algorithm can train on. A starting point, not a tuned entry.
 
 Choices worth knowing, and why they are made:
 
@@ -14,31 +13,24 @@ Choices worth knowing, and why they are made:
 * Homes and seeds. Every episode shuffles the six published metro homes (1, 5, 9, 13, 17, 21)
   across the five seats and draws a fresh world seed, so the policy cannot memorise one seating.
 * Truncation. The raw env never ends an episode, so the wrapper truncates at ``--episode-ticks``
-  (the match length, 1000); SB3 bootstraps the value through it instead of treating it as terminal.
+  (the match length, 1000); SB3 bootstraps through it instead of treating it as terminal.
 * Bounded logits (SAC only). The 35 argmax-decoded logit dims (expansion, automation) are bounded
   +/-1e9 in the env. SAC squashes through tanh to the bounds, so its logits are bounded to
   [-1, 1], which decodes identically; continuous levers keep their true bounds. This is rejected
   for the PPO family: SB3 clips its Gaussian samples, so in ~97% of samples two or more of the
   32 expansion logits tie at +1 and argmax picks index 0 ~16% of the time (uniform: 3%).
 * Observations are not normalised in the env, since scoring applies no ``VecNormalize``
-  statistics. Cash starts at 15,000 and grows with cumulative profit: cherry-picker and fortress
-  reach ~1.3e6 and ~4.5e5 over 1000 rounds. The PPO family trains on raw observations. SAC trains
-  on ``obs / scale`` (scale from a random warm-up rollout, which an improving policy will exceed)
-  and folds it into the first layers, so the saved zip takes raw observations; the fold is
-  checked on the actor and both critics (outputs match to 1e-5, relative above 1).
+  statistics. The PPO family trains on raw observations (cash starts at 15,000 and reaches ~1e6).
+  SAC trains on ``obs / scale`` (scale from a random warm-up rollout, which an improving policy
+  will exceed) and folds it into the first layers, so the saved zip takes raw observations; the
+  fold is checked on the actor and both critics (outputs match to 1e-5, relative above 1).
 * Rewards are scaled for training only: ``VecNormalize(norm_obs=False)`` for the PPO family, a
   fixed factor for SAC. SB3's off-policy algorithms store the un-normalised reward, so
   ``VecNormalize`` would do nothing there. SAC's logged episode reward carries that factor.
 * Seeding follows the README: ``set_random_seed``, not the ``seed=`` argument. Each env copy is
   built separately with its own seed; cloning one env would replay identical worlds.
 
-Train, then self-check the zip against the same NPC field:
-
-    python scripts/train_vs_npcs.py my_sac --algo sac --steps 300000 --out runs/my_sac.zip
-    python scripts/arena_competition.py --balanced --rounds 1000 \\
-        --player MySac=runs/my_sac.zip \\
-        --npc cherry-picker --npc fortress --npc fast-follower --npc sprawler \\
-        --out results.json --csv decisions.csv
+Train and self-check commands: see the README, "Example: train against the NPC field".
 """
 
 from __future__ import annotations
@@ -263,12 +255,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--steps",
         type=int,
         default=300_000,
-        help="env steps summed over copies; PPO and RecurrentPPO round up to whole rollouts "
-        "(PPO: 2048 per copy, so --steps 2048 --n-envs 2 trains 4096)",
+        help="env steps summed over copies. On-policy algos round up to whole rollouts: PPO 2048 "
+        "steps per copy, RecurrentPPO 128 (--steps 300000 --n-envs 3 trains 301,056 / 300,288)",
     )
-    parser.add_argument("--n-envs", type=int, default=4, help="separately seeded env copies")
-    parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--episode-ticks", type=int, default=1000)
+    parser.add_argument(
+        "--n-envs",
+        type=int,
+        default=4,
+        help="copies step in turn in one process (DummyVecEnv), so more copies use no more cores",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=0, help="root seed for SB3, SAC's warm-up and each env copy"
+    )
+    parser.add_argument(
+        "--episode-ticks", type=int, default=1000, help="episode length; the wrapper truncates here"
+    )
     parser.add_argument("--out", type=Path, help="zip path (default: runs/<label>.zip)")
     parser.add_argument(
         "--bound-logits",
