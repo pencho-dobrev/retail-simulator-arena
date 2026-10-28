@@ -233,3 +233,7 @@ NPC field is not a prediction of your rank. The published home rotation is
 fixed seed, a fixed set of starting regions or a fixed set of opponents will not
 necessarily score well. Train for robustness across seeds, starting regions and
 opponents.
+
+Checkpoints are compared at scoring time. If two entries' checkpoint files are
+byte-identical (same SHA-256), only the entry whose issue was filed first is
+scored; the later one is disqualified.
