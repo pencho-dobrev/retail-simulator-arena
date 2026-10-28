@@ -1,10 +1,10 @@
 """Example trainer: one learning seat against the NPC field, with your own loop.
 
 ``scripts/arena_train_player.py`` trains in a two-seat match at fixed home regions (1 and 5).
-This script is the other common baseline: ONE learning seat in the same five-seat field the
-self-check plays (``cherry-picker``, ``fortress``, ``fast-follower``, ``sprawler``), written as a
-plain Gymnasium env so any Stable-Baselines3 algorithm can train on it. It is a starting point
-to read and edit, not a tuned entry.
+This script is the other common baseline: ONE learning seat in the five-seat field the
+self-check plays (``cherry-picker``, ``fortress``, ``fast-follower``, ``sprawler``), as a plain
+Gymnasium env that any Stable-Baselines3 algorithm can train on. A starting point, not a tuned
+entry.
 
 Choices worth knowing, and why they are made:
 
@@ -14,16 +14,18 @@ Choices worth knowing, and why they are made:
 * Homes and seeds. Every episode shuffles the six published metro homes (1, 5, 9, 13, 17, 21)
   across the five seats and draws a fresh world seed, so the policy cannot memorise one seating.
 * Truncation. The raw env never ends an episode, so the wrapper truncates at ``--episode-ticks``
-  (the match length, 1000). SB3 bootstraps the value through a truncation instead of treating
-  it as a terminal state.
-* Bounded logits. The 35 argmax-decoded logit dims (expansion, automation) are bounded +/-1e9
-  in the env's action space. SAC squashes through tanh to the space's bounds, so for SAC they are
-  bounded to [-1, 1], which decodes identically. Continuous levers keep their true bounds.
-  ``--bound-logits`` / ``--no-bound-logits`` overrides the default (on for SAC only).
-* Scoring never applies ``VecNormalize`` statistics, so observations are not normalised in
-  the env. Raw observations reach ~2e4 (cash); the PPO family trains on them as they are. SAC
-  trains on ``obs / scale`` and the scale is then folded into the first layer, so the saved zip
-  still takes raw observations (the fold is checked: predictions must match to 1e-5).
+  (the match length, 1000); SB3 bootstraps the value through it instead of treating it as terminal.
+* Bounded logits (SAC only). The 35 argmax-decoded logit dims (expansion, automation) are bounded
+  +/-1e9 in the env. SAC squashes through tanh to the bounds, so its logits are bounded to
+  [-1, 1], which decodes identically; continuous levers keep their true bounds. This is rejected
+  for the PPO family: SB3 clips its Gaussian samples, so in ~97% of samples two or more of the
+  32 expansion logits tie at +1 and argmax picks index 0 ~16% of the time (uniform: 3%).
+* Observations are not normalised in the env, since scoring applies no ``VecNormalize``
+  statistics. Cash starts at 15,000 and grows with cumulative profit: cherry-picker and fortress
+  reach ~1.3e6 and ~4.5e5 over 1000 rounds. The PPO family trains on raw observations. SAC trains
+  on ``obs / scale`` (scale from a random warm-up rollout, which an improving policy will exceed)
+  and folds it into the first layers, so the saved zip takes raw observations; the fold is
+  checked on the actor and both critics (outputs match to 1e-5, relative above 1).
 * Rewards are scaled for training only: ``VecNormalize(norm_obs=False)`` for the PPO family, a
   fixed factor for SAC. SB3's off-policy algorithms store the un-normalised reward, so
   ``VecNormalize`` would do nothing there. SAC's logged episode reward carries that factor.
@@ -154,13 +156,13 @@ class NpcFieldEnv(gym.Env):
         return obs if self._obs_scale is None else (obs / self._obs_scale).astype(np.float32)
 
 
-def estimate_obs_scale(
-    seed: int,
-) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+def estimate_obs_scale(seed: int) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
     """Per-dim scale (peak |obs| over a random-action rollout, floored at 1) and sample obs.
 
-    Raw observations reach ~2e4 (cash), which a freshly initialised network handles badly. The
-    scale only has to be roughly right; trained play may exceed it.
+    Raw observations are far from unit scale (cash is 15,000 at the start), which a freshly
+    initialised network handles badly. A random policy's peaks sit well below a good policy's
+    (cash ~3.5e4 against 4.5e5 to 1.3e6 for the strongest NPCs), so trained play will exceed
+    this scale; it only has to be roughly right.
     """
     env = NpcFieldEnv(seed, bound_logits=True)
     env.action_space.seed(seed)
@@ -188,6 +190,15 @@ def fold_obs_scale(model: SAC, obs_scale: npt.NDArray[np.float32]) -> None:
     with torch.no_grad():
         for first in [policy.actor.latent_pi[0], *(net[0] for net in critics)]:
             first.weight[:, : len(inv)] *= inv
+
+
+def network_outputs(model: SAC, obs: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    """Actor action plus both critics' and both target critics' Q-values, for drift checks."""
+    obs_t = torch.as_tensor(obs, dtype=torch.float32)
+    with torch.no_grad():
+        action = model.policy.actor(obs_t, deterministic=True)
+        q_values = [*model.policy.critic(obs_t, action), *model.policy.critic_target(obs_t, action)]
+    return torch.cat([action, *q_values], dim=1).numpy()
 
 
 def make_env_fns(args: argparse.Namespace, **env_kwargs: Any) -> list[Callable[[], gym.Env]]:
@@ -234,10 +245,10 @@ def train(args: argparse.Namespace) -> Any:
     model = build_model(args, venv)
     model.learn(total_timesteps=args.steps)
     if obs_scale is not None:
-        before, _ = model.predict(samples / obs_scale, deterministic=True)
+        before = network_outputs(model, samples / obs_scale)
         fold_obs_scale(model, obs_scale)
-        after, _ = model.predict(samples, deterministic=True)
-        drift = float(np.max(np.abs(before - after)))
+        after = network_outputs(model, samples)
+        drift = float(np.max(np.abs(before - after) / np.maximum(1.0, np.abs(before))))
         if drift > 1e-5:
             raise RuntimeError(f"folding the obs scale changed predictions by {drift:.2e}")
         print(f"obs scale folded into the network (max prediction drift {drift:.1e})")
@@ -248,20 +259,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train one arena entry against the NPC field.")
     parser.add_argument("label", help="run name; names the default --out")
     parser.add_argument("--algo", choices=("ppo", "recurrent_ppo", "sac"), default="ppo")
-    parser.add_argument("--steps", type=int, default=300_000, help="env steps summed over copies")
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=300_000,
+        help="env steps summed over copies; PPO and RecurrentPPO round up to whole rollouts "
+        "(PPO: 2048 per copy, so --steps 2048 --n-envs 2 trains 4096)",
+    )
     parser.add_argument("--n-envs", type=int, default=4, help="separately seeded env copies")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--episode-ticks", type=int, default=1000)
-    parser.add_argument(
-        "--out", type=Path, default=None, help="zip path (default: runs/<label>.zip)"
-    )
+    parser.add_argument("--out", type=Path, help="zip path (default: runs/<label>.zip)")
     parser.add_argument(
         "--bound-logits",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="bound the argmax logit dims to [-1, 1] (default: on for sac, off otherwise)",
+        help="SAC only (on by default): bound the argmax logit dims to [-1, 1]; "
+        "rejected for ppo and recurrent_ppo, whose clipped samples would bias argmax",
     )
     args = parser.parse_args(argv)
+    if args.bound_logits is not None and args.algo != "sac":
+        parser.error(f"--bound-logits / --no-bound-logits is SAC only, not for --algo {args.algo}")
     if args.bound_logits is None:
         args.bound_logits = args.algo == "sac"
     args.out = args.out or Path("runs") / f"{args.label}.zip"
