@@ -20,7 +20,7 @@ Choices worth knowing, and why they are made:
   for the PPO family: SB3 clips its Gaussian samples, so in ~97% of samples two or more of the
   32 expansion logits tie at +1 and argmax picks index 0 ~16% of the time (uniform: 3%).
 * Observations are not normalised in the env, since scoring applies no ``VecNormalize``
-  statistics. The PPO family trains on raw observations (cash starts at 15,000 and reaches ~1e6).
+  statistics. The PPO family trains on raw observations (cash: 15,000; top NPCs reach ~1e6).
   SAC trains on ``obs / scale`` (scale from a random warm-up rollout, which an improving policy
   will exceed) and folds it into the first layers, so the saved zip takes raw observations; the
   fold is checked on the actor and both critics (outputs match to 1e-5, relative above 1).
@@ -30,7 +30,7 @@ Choices worth knowing, and why they are made:
 * Seeding follows the README: ``set_random_seed``, not the ``seed=`` argument. Each env copy is
   built separately with its own seed; cloning one env would replay identical worlds.
 
-Train and self-check commands: see the README, "Example: train against the NPC field".
+Commands: see the README, "Example: train against the NPC field" and "Self-check".
 """
 
 from __future__ import annotations

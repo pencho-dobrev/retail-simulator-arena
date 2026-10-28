@@ -7,8 +7,9 @@ world's tuning are intentionally not included.
 
 ## Setup
 
-Use Python 3.11 or 3.12. Python 3.13 and newer are not supported: `numpy<2.0`
-publishes no prebuilt wheels for them, so `pip install` refuses them up front:
+Use Python 3.11 or 3.12. Python 3.13 and newer are not supported (`numpy<2.0`
+publishes no prebuilt wheels for them), so the package's `requires-python` makes
+`pip install` refuse them up front:
 
 ```text
 ERROR: Package 'retail-simulator' requires a different Python: 3.14.6 not in '<3.13,>=3.11'
