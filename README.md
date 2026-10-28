@@ -60,14 +60,77 @@ python scripts/arena_train_player.py my_share --world balanced \
     --reward weighted --seeds 1,1,43
 ```
 
+### The end-of-run output
+
+When training finishes, the trainer plays the pool's own checkpoints against each
+other and prints a table ending in a `VERDICT: rl_confirms=…` line. That line is
+a diagnostic about the pool of checkpoints, not a check on your agent:
+`rl_confirms=False (RL does NOT confirm)` does not mean training failed, and it
+has no bearing on whether a checkpoint is a valid entry. The same goes for the
+warning `only N distinct trained checkpoint(s) — a tournament needs >=3 …
+(Expected with --smoke's tiny round count …)` on short runs. `--smoke` is a flag
+of the underlying driver, `scripts/phase4_rl_confirm.py`, and
+`arena_train_player.py` does not take it; ignore the warning. Whether an entry
+is valid is decided by the [self-check](#self-check) and the checklist on the
+entry form.
+
+### Your own training loop
+
 Training with your own loop or another algorithm? Seed Stable-Baselines3 with
 `stable_baselines3.common.utils.set_random_seed(seed)`, not the `seed=` argument.
 The vector environment SuperSuit builds has no `seed()` method, so
 `PPO("MlpPolicy", venv, seed=0)` raises
 `AttributeError: 'ConcatVecEnv' object has no attribute 'seed'`, with every
-SuperSuit version this repo installs. `build_parallel_vec_env` in
-`retail_simulator.envs.parallel_gate.bridge` builds the vector environment the
-arena trainer uses.
+SuperSuit version this repo installs.
+
+`build_parallel_vec_env` in `retail_simulator.envs.parallel_gate.bridge` wraps a
+`RetailParallelEnv` in the SuperSuit bridge the trainer uses, but its defaults
+are not the arena. Called with no arguments it builds a 2-region world with the
+weighted reward and a 42-dimensional observation; a policy trained there cannot
+play the 318-dimensional arena. Pass the arena explicitly:
+
+| Argument | Default | In the arena |
+| --- | --- | --- |
+| `config` | 2-region world, weighted reward | `arena_balanced_config()` from `retail_simulator.envs.arena`: 25 regions, profit reward unless you change it, 318-dimensional observation |
+| `home_regions` | none; seat 0 then starts with a store in **every** region | `arena_home_regions(n_seats)`: one home per seat, regions `1, 5, 9, …` in seat order |
+| `mask_expansion_seats` | none | your learning seat(s). The trainer and the self-check both play your seat with expansion masking on |
+| `n_learning_agents` | 2 | seats played by your policy. Every seat this function builds is played by the one shared policy |
+| `npc_archetypes` | none | leave it empty; see the first trap below |
+
+Four traps to know about:
+
+- **`npc_archetypes` cannot seat the self-check field.** It takes the engine's
+  built-in NPC names (`discounter`, `premium`, `balanced`, `wandering`). The
+  self-check's `cherry-picker`, `fortress`, `fast-follower` and `sprawler` are a
+  different family, so passing one raises
+  `ValueError: unknown NPC archetype 'fortress'`. The self-check seats them as
+  ordinary seats and drives each with a predict function from
+  `geo_archetypes(n_regions, config.demand.regions)`. To train against that
+  field, seat it the same way in your own wrapper around `RetailParallelEnv`
+  rather than through `build_parallel_vec_env`. `ArenaMatch` in
+  `src/retail_simulator/envs/arena_match.py` is the reference: every seat,
+  NPCs included, is a `RetailParallelEnv` learning seat; the self-check puts the
+  players first and the NPCs after them; homes come from `arena_home_regions`;
+  expansion masking is on for the player seats only; and each NPC is called with
+  its own seat's observation and `episode_start=True` on its first call after a
+  reset. That flag matters: each NPC counts rounds internally and only restarts
+  the count when it sees it. The four predict functions are in
+  `src/retail_simulator/envs/geo_archetypes.py`.
+- **Leaving out `home_regions` gives seat 0 the whole map.** With no
+  `home_regions` and no `npc_archetypes`, seat 0 starts with a store in all 25
+  regions and every other seat with one, so a policy trained there never sees
+  the one-store start it is scored from. The self-check seats every entry in a
+  single home region, and final scoring rotates those home regions (see
+  [Rules](#rules)).
+- **The environment never ends an episode.** `terminated` and `truncated` are
+  always `False`, so SB3 sees one endless episode and never logs an episode
+  return. A self-check match is 1,000 rounds long. If you want episodes,
+  truncate them in your own wrapper.
+- **`num_vec_envs=N` does not give N independent worlds.** SuperSuit makes the
+  copies by cloning one environment, random state included, so all N start from
+  the same random stream: given the same actions, two copies follow the same
+  trajectory. To get independent copies, build each environment yourself with
+  its own seed.
 
 ## Self-check
 
@@ -82,12 +145,53 @@ python scripts/arena_competition.py --balanced --rounds 1000 \
     --out results.json --csv decisions.csv
 ```
 
+> **Pass `--balanced`.** `scripts/arena_competition.py` plays the lock world
+> unless you pass `--balanced`, while the trainer defaults to
+> `--world balanced`. Without the flag the match still runs, but in a different
+> world from the one you trained in and the one the competition is played in, so
+> its numbers say nothing about your entry. The first log line names the world:
+> it should read `arena match starting: arena-balanced (…) world`.
+
 ## Submit
 
-Open an entry at
-https://github.com/pencho-dobrev/retail-simulator-arena/issues/new with your
-checkpoint and an `entry.json`. The checkpoint is a standard Stable-Baselines3 or
-sb3-contrib `.zip` written by `model.save(...)`, from one of these algorithms:
+Open an entry with the
+[competition entry form](https://github.com/pencho-dobrev/retail-simulator-arena/issues/new?template=competition-entry.yml)
+and attach two files to it: your checkpoint `.zip` and an `entry.json`.
+
+`entry.json` describes the checkpoint. It has six fields, the same ones the form
+asks for:
+
+| Field | Value | Notes |
+| --- | --- | --- |
+| `team` | string | Your team name, as it should appear in the standings. |
+| `agent_name` | string | The name for this checkpoint's seat. |
+| `policy_kind` | `"ppo-mlp"`, `"a2c-mlp"`, `"recurrent-ppo-lstm"`, `"sac"`, `"td3"`, `"ddpg"` or `"tqc"` | The algorithm and policy the zip was trained with. The tooling detects it from the zip, but when it cannot read the zip it falls back to `ppo-mlp` without failing. That only goes unnoticed for a `recurrent-ppo-lstm` entry, which would then play without its recurrent state, so your declaration is what makes the fallback visible. |
+| `contact` | string | How the organizer reaches you about the entry. |
+| `training_recipe` | string or object | Free text, or the contents of the `recipe.json` that `arena_train_player.py` wrote into your pool directory. |
+| `sb3_version` | string | The stable-baselines3 version that saved the zip (the repo pins `>=2.3,<3.0`). |
+
+Read `sb3_version` from the zip itself rather than from your current
+environment: `model.save(...)` writes a `system_info.txt` into the zip, and its
+`Stable-Baselines3:` line is the version that saved it. This is the same for
+sb3-contrib algorithms.
+
+```bash
+unzip -p path/to/model.zip system_info.txt
+```
+
+```json
+{
+  "team": "your-team",
+  "agent_name": "MyAgent",
+  "policy_kind": "ppo-mlp",
+  "contact": "you@example.com",
+  "training_recipe": "arena_train_player.py my_agent --world balanced --ent-coef 0.02 --seeds 2,2,44",
+  "sb3_version": "2.8.0"
+}
+```
+
+The checkpoint is a standard Stable-Baselines3 or sb3-contrib `.zip` written by
+`model.save(...)`, from one of these algorithms:
 
 | Algorithm | Policy | Library |
 | --- | --- | --- |

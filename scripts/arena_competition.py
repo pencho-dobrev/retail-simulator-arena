@@ -73,7 +73,8 @@ def _build_parser() -> argparse.ArgumentParser:
     world.add_argument(
         "--balanced",
         action="store_true",
-        help="play in arena_balanced_config() instead of the pre-registered lock",
+        help="play in arena_balanced_config(), the world the competition is played in; "
+        "without this flag the match plays the lock world",
     )
     world.add_argument(
         "--overhead",
