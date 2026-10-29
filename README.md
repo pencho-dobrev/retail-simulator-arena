@@ -169,6 +169,17 @@ python -c "import base64,json,re,sys,zipfile; d=json.loads(zipfile.ZipFile(sys.a
 It tells policy families apart, not every algorithm: A2C also prints
 `ActorCriticPolicy`, and DDPG prints `TD3Policy`.
 
+### Improving your agent
+
+The guides in [`guides/`](guides/) suggest where to look once your first agent runs. Each topic
+has a short hints page and a study guide of courses, articles and papers to learn from.
+
+| Topic | Hints | Study guide |
+| --- | --- | --- |
+| Tuning your training | [Param tuning hints](guides/PARAM_TUNING_HINTS.md) | [Param tuning study](guides/PARAM_TUNING_STUDY.md) |
+| Picking and growing a champion | [Training tournament hints](guides/TRAINING_TOURNAMENT_HINTS.md) | [Training tournament study](guides/TRAINING_TOURNAMENT_STUDY.md) |
+| Designing rewards and sparring partners | [Reward design hints](guides/REWARD_DESIGN_HINTS.md) | [Reward design study](guides/REWARD_DESIGN_STUDY.md) |
+
 ## Self-check
 
 Seat your checkpoint against the NPC field with
