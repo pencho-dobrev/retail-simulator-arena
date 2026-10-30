@@ -180,6 +180,11 @@ has a short hints page and a study guide of courses, articles and papers to lear
 | Picking and growing a champion | [Training tournament hints](guides/TRAINING_TOURNAMENT_HINTS.md) | [Training tournament study](guides/TRAINING_TOURNAMENT_STUDY.md) |
 | Designing rewards and sparring partners | [Reward design hints](guides/REWARD_DESIGN_HINTS.md) | [Reward design study](guides/REWARD_DESIGN_STUDY.md) |
 
+### Presenting your work
+
+Each team gives a short presentation about its experience. The
+[presentation guide](guides/PRESENTATION_GUIDE.md) lists what to cover.
+
 ## Self-check
 
 Seat your checkpoint against the NPC field with
